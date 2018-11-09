@@ -1,35 +1,35 @@
-/*
-A non-ecommerce event has the following schema:
-
-{
-    DeviceId: "a80eea1c-57f5-4f84-815e-06fe971b6ef2",
-    EventAttributes: {test: "Error", t: 'stack trace in string form'},
-    EventName: "Error",
-    MPID: "123123123123",
-    UserAttributes: {userAttr1: 'value1', userAttr2: 'value2'},
-    UserIdentities: [{Identity: 'email@gmail.com', Type: 7}]
-    User Identity Types can be found here:
-}
-
-*/
+var optimizelyEvents = require('./optimizely-defined-events');
 
 var eventHandler = {
     logEvent: function(event) {
+        if (optimizelyEvents.events[event.EventName]) {
+            var optimizelyEvent = {
+                type: 'event',
+                eventName: event.EventName
+            };
 
-    },
-    logError: function(event) {
-        // The schema for a logError event is the same, but noteworthy differences are as follows:
-        // {
-        //     EventAttributes: {m: 'name of error passed into MP', s: "Error", t: 'stack trace in string form if applicable'},
-        //     EventName: "Error"
-        // }
-    },
-    logPagView: function(event) {
-        /* The schema for a logPagView event is the same, but noteworthy differences are as follows:
-        {
-            EventAttributes: {hostname: "www.google.com", title: 'Test Page'},  // These are event attributes only if no additional event attributes are explicitly provided to mParticle.logPageView(...)
+            if (event.EventAttributes) {
+                optimizelyEvent.tags = event.EventAttributes;
+            }
+
+            if (event.CustomFlags && event.CustomFlags['Optimizely.Value']) {
+                optimizelyEvent.tags.value = event.CustomFlags['Optimizely.Value'];
+            }
+            window['optimizely'].push(optimizelyEvent);
         }
-        */
+    },
+    logPageView: function(event) {
+        if (optimizelyEvents.pages[event.EventName]) {
+            var optimizelyEvent = {
+                type: 'page',
+                pageName: event.EventName
+            };
+
+            if (event.EventAttributes) {
+                optimizelyEvent.tags = event.EventAttributes;
+            }
+            window['optimizely'].push(optimizelyEvent);
+        }
     }
 };
 

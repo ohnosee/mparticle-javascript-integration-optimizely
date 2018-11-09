@@ -1,14 +1,7 @@
 /* eslint-disable no-undef*/
-describe('XYZ Forwarder', function () {
+describe('Optimizely Forwarder', function () {
     // -------------------DO NOT EDIT ANYTHING BELOW THIS LINE-----------------------
-    var expandCommerceEvent = function(event) {
-            return [{
-                EventName: event.EventName,
-                EventDataType: event.EventDataType,
-                EventAttributes: event.EventAttributes
-            }];
-        },
-        MessageType = {
+    var MessageType = {
             SessionStart: 1,
             SessionEnd: 2,
             PageView: 3,
@@ -99,77 +92,42 @@ describe('XYZ Forwarder', function () {
 
 // -------------------DO NOT EDIT ANYTHING ABOVE THIS LINE-----------------------
 // -------------------START EDITING BELOW:-----------------------
-        MockXYZForwarder = function() {
+        OptimizelyMockForwarder = function() {
             var self = this;
-
-            // create properties for each type of event you want tracked, see below for examples
-            this.trackCustomEventCalled = false;
-            this.logPurchaseEventCalled = false;
-            this.initializeCalled = false;
-
-            this.trackCustomName = null;
-            this.logPurchaseName = null;
-            this.apiKey = null;
-            this.appId = null;
-            this.userId = null;
-            this.userAttributes = {};
-            this.userIdField = null;
-
-            this.eventProperties = [];
-            this.purchaseEventProperties = [];
-
-            // stub your different methods to ensure they are being called properly
-            this.initialize = function(appId, apiKey) {
-                self.initializeCalled = true;
-                self.apiKey = apiKey;
-                self.appId = appId;
+            this.eventQueue = [];
+            this.push = function(event) {
+                self.eventQueue.push(event);
             };
-
-            this.stubbedTrackingMethod = function(name, eventProperties){
-                self.trackCustomEventCalled = true;
-                self.trackCustomName = name;
-                self.eventProperties.push(eventProperties);
-                // Return true to indicate event should be reported
-                return true;
-            };
-
-            this.stubbedUserAttributeSettingMethod = function(userAttributes) {
-                self.userId = id;
-                userAttributes = userAttributes || {};
-                if (Object.keys(userAttributes).length) {
-                    for (var key in userAttributes) {
-                        if (userAttributes[key] === null) {
-                            delete self.userAttributes[key];
-                        }
-                        else {
-                            self.userAttributes[key] = userAttributes[key];
-                        }
+            this.get = function() {
+                return {
+                    pages: {
+                        123: {apiName: 'test name', id: 123}},
+                    events: {
+                        234: {apiName: 'Test Event', id: 234},
+                        345: {apiName: 'RevenueTestEventName', id: 345},
+                        456: {apiName: 'eCommerce - purchase - Total', id: 456},
+                        567: {apiName: 'eCommerce - purchase - Item', id: 567},
+                        789: {apiName: 'eCommerce - add_to_cart - Item', id: 789},
+                        890: {apiName: 'eCommerce - click - Item', id: 890}
                     }
-                }
-            };
-
-            this.stubbedUserIdSettingMethod = function(id) {
-                self.userId = id;
+                };
             };
         };
 
     before(function () {
+        mParticle.init();
         mParticle.EventType = EventType;
         mParticle.ProductActionType = ProductActionType;
         mParticle.PromotionType = PromotionActionType;
         mParticle.IdentityType = IdentityType;
         mParticle.CommerceEventType = CommerceEventType;
-        mParticle.eCommerce = {};
-        mParticle.eCommerce.expandCommerceEvent = expandCommerceEvent;
     });
 
     beforeEach(function() {
-        window.MockXYZForwarder = new MockXYZForwarder();
+        window.optimizely = new OptimizelyMockForwarder();
         // Include any specific settings that is required for initializing your SDK here
         var sdkSettings = {
-            clientKey: '123456',
-            appId: 'abcde',
-            userIdField: 'customerId'
+            projectId: '123456'
         };
         // You may require userAttributes or userIdentities to be passed into initialization
         var userAttributes = {
@@ -185,10 +143,11 @@ describe('XYZ Forwarder', function () {
             Identity: 'facebook',
             Type: IdentityType.Facebook
         }];
+
         mParticle.forwarder.init(sdkSettings, reportService.cb, true, null, userAttributes, userIdentities);
     });
 
-    it('should log event', function(done) {
+    it('should log a custom event', function(done) {
         mParticle.forwarder.process({
             EventDataType: MessageType.PageEvent,
             EventName: 'Test Event',
@@ -199,8 +158,12 @@ describe('XYZ Forwarder', function () {
             }
         });
 
-        window.MockXYZForwarder.eventProperties[0].label.should.equal('label');
-        window.MockXYZForwarder.eventProperties[0].value.should.equal(200);
+        window.optimizely.eventQueue.length.should.equal(1);
+        window.optimizely.eventQueue[0].type.should.equal('event');
+        window.optimizely.eventQueue[0].eventName.should.equal('Test Event');
+        window.optimizely.eventQueue[0].tags.label.should.equal('label');
+        window.optimizely.eventQueue[0].tags.value.should.equal(200);
+        window.optimizely.eventQueue[0].tags.category.should.equal('category');
 
         done();
     });
@@ -215,17 +178,18 @@ describe('XYZ Forwarder', function () {
             }
         });
 
-        window.MockXYZForwarder.trackCustomEventCalled.should.equal(true);
-        window.MockXYZForwarder.trackCustomName.should.equal('test name');
-        window.MockXYZForwarder.eventProperties[0].attr1.should.equal('test1');
-        window.MockXYZForwarder.eventProperties[0].attr2.should.equal('test2');
+        window.optimizely.eventQueue.length.should.equal(1);
+        window.optimizely.eventQueue[0].type.should.equal('page');
+        window.optimizely.eventQueue[0].pageName.should.equal('test name');
+        window.optimizely.eventQueue[0].tags.attr1.should.equal('test1');
+        window.optimizely.eventQueue[0].tags.attr2.should.equal('test2');
 
         done();
     });
 
-    it('should log a product purchase commerce event', function(done) {
+    it('should log a standard commerce event as default mParticle event name if no customFlags are passsed', function(done) {
         mParticle.forwarder.process({
-            EventName: 'Test Purchase Event',
+            EventName: 'eCommerce - Purchase',
             EventDataType: MessageType.Commerce,
             EventCategory: EventType.ProductPurchase,
             ProductAction: {
@@ -252,36 +216,159 @@ describe('XYZ Forwarder', function () {
             }
         });
 
-        window.MockXYZForwarder.trackCustomEventCalled.should.equal(true);
-        window.MockXYZForwarder.trackCustomName.should.equal('Purchase');
+        window.optimizely.eventQueue.length.should.equal(2);
+        window.optimizely.eventQueue[0].eventName.should.equal('eCommerce - purchase - Total');
+        window.optimizely.eventQueue[0].type.should.equal('event');
+        window.optimizely.eventQueue[0].tags.revenue.should.equal(45000);
+        window.optimizely.eventQueue = [];
 
-        window.MockXYZForwarder.eventProperties[0].Sku.should.equal('12345');
-        window.MockXYZForwarder.eventProperties[0].Name.should.equal('iPhone 6');
-        window.MockXYZForwarder.eventProperties[0].Category.should.equal('Phones');
-        window.MockXYZForwarder.eventProperties[0].Brand.should.equal('iPhone');
-        window.MockXYZForwarder.eventProperties[0].Variant.should.equal('6');
-        window.MockXYZForwarder.eventProperties[0].Price.should.equal(400);
-        window.MockXYZForwarder.eventProperties[0].TotalAmount.should.equal(400);
-        window.MockXYZForwarder.eventProperties[0].CouponCode.should.equal('coupon-code');
-        window.MockXYZForwarder.eventProperties[0].Quantity.should.equal(1);
+        mParticle.forwarder.process({
+            EventName: 'eCommerce - AddToCart',
+            EventDataType: MessageType.Commerce,
+            EventCategory: EventType.ProductPurchase,
+            ProductAction: {
+                ProductActionType: ProductActionType.AddToCart,
+                ProductList: [
+                    {
+                        Sku: '12345',
+                        Name: 'iPhone 6',
+                        Category: 'Phones',
+                        Brand: 'iPhone',
+                        Variant: '6',
+                        Price: 400,
+                        TotalAmount: 400,
+                        CouponCode: 'coupon-code',
+                        Quantity: 1
+                    },
+                    {
+                        Sku: '12345',
+                        Name: 'iPhone 6',
+                        Category: 'Phones',
+                        Brand: 'iPhone',
+                        Variant: '6',
+                        Price: 400,
+                        TotalAmount: 400,
+                        CouponCode: 'coupon-code',
+                        Quantity: 1
+                    }
+                ]
+            }
+        });
+
+        window.optimizely.eventQueue.length.should.equal(2);
+        window.optimizely.eventQueue[0].eventName.should.equal('eCommerce - add_to_cart - Item');
+        window.optimizely.eventQueue[0].type.should.equal('event');
+        Should(window.optimizely.eventQueue[0].tags.revenue).not.be.ok();
 
         done();
     });
 
-    it('should set user attributes when passed on init', function(done) {
-        window.MockXYZForwarder.userAttributes.color.should.equal('green');
+    it('should log a product purchase commerce with custom name if customFlag of Optimizely.EventName is passed', function(done) {
+        mParticle.forwarder.process({
+            EventName: 'eCommerce - Purchase',
+            CustomFlags: {
+                'Optimizely.EventName': 'RevenueTestEventName'
+            },
+            EventDataType: MessageType.Commerce,
+            EventCategory: EventType.ProductPurchase,
+            ProductAction: {
+                ProductActionType: ProductActionType.Purchase,
+                ProductList: [
+                    {
+                        Sku: '12345',
+                        Name: 'iPhone 6',
+                        Category: 'Phones',
+                        Brand: 'iPhone',
+                        Variant: '6',
+                        Price: 400,
+                        TotalAmount: 400,
+                        CouponCode: 'coupon-code',
+                        Quantity: 1
+                    }
+                ],
+                TransactionId: 123,
+                Affiliation: 'my-affiliation',
+                TotalAmount: 450,
+                TaxAmount: 40,
+                ShippingAmount: 10,
+                CouponCode: null
+            }
+        });
+        window.optimizely.eventQueue.length.should.equal(2);
+        window.optimizely.eventQueue[0].eventName.should.equal('RevenueTestEventName');
+        window.optimizely.eventQueue[0].type.should.equal('event');
+        window.optimizely.eventQueue[0].tags.revenue.should.equal(45000);
+        window.optimizely.eventQueue[1].eventName.should.equal('eCommerce - purchase - Item');
+        window.optimizely.eventQueue[1].type.should.equal('event');
+        window.optimizely.eventQueue[1].tags.Id.should.equal('12345');
+        window.optimizely.eventQueue[1].tags.Name.should.equal('iPhone 6');
+        window.optimizely.eventQueue[1].tags.Variant.should.equal('6');
+        Should(window.optimizely.eventQueue[1].tags.revenue).not.be.ok();
 
         done();
     });
 
-    it('should set user attributes when directly called', function(done) {
-        mParticle.forwarder.setUserAttribute('color', 'blue');
-        window.MockXYZForwarder.userAttributes.color.should.equal('blue');
+    it('should log non-product purchases using mParticle default expanded commerce event name', function(done) {
+        mParticle.forwarder.process({
+            EventName: 'eCommerce - PromotionClick',
+            EventDataType: MessageType.Commerce,
+            EventCategory: mParticle.CommerceEventType.PromotionClick,
+            PromotionAction: {
+                PromotionActionType: mParticle.PromotionType.PromotionClick,
+                PromotionList: [{
+                    Creative: 'creative',
+                    Id: 'id',
+                    Name: 'promotion1'}]
+            }
+        });
+        window.optimizely.eventQueue.length.should.equal(1);
+        window.optimizely.eventQueue[0].eventName.should.equal('eCommerce - click - Item');
+        window.optimizely.eventQueue[0].type.should.equal('event');
+        window.optimizely.eventQueue[0].tags.Creative.should.equal('creative');
+        window.optimizely.eventQueue[0].tags.Id.should.equal('id');
+        window.optimizely.eventQueue[0].tags.Name.should.equal('promotion1');
+
+        window.optimizely.eventQueue = [];
+
 
         done();
     });
 
-    it('should remove user attributes', function(done) {
+    it('should log a value event to Optimizely', function(done) {
+        mParticle.forwarder.process({
+            CustomFlags: {
+                'Optimizely.Value': 5
+            },
+            EventDataType: MessageType.PageEvent,
+            EventName: 'Test Event',
+            EventAttributes: {
+                label: 'label',
+                category: 'category'
+            }
+        });
+
+        window.optimizely.eventQueue.length.should.equal(1);
+        window.optimizely.eventQueue[0].type.should.equal('event');
+        window.optimizely.eventQueue[0].eventName.should.equal('Test Event');
+        window.optimizely.eventQueue[0].tags.label.should.equal('label');
+        window.optimizely.eventQueue[0].tags.value.should.equal(5);
+        window.optimizely.eventQueue[0].tags.category.should.equal('category');
+
+        done();
+    });
+
+    it('should set and remove user attributes properly', function(done) {
+        mParticle.forwarder.setUserAttribute('key', 'value');
+
+        window.optimizely.eventQueue.length.should.equal(1);
+        window.optimizely.eventQueue[0].type.should.equal('user');
+        window.optimizely.eventQueue[0].attributes.key.should.equal('value');
+
+        mParticle.forwarder.removeUserAttribute('key');
+
+        window.optimizely.eventQueue.length.should.equal(2);
+        window.optimizely.eventQueue[1].type.should.equal('user');
+        (window.optimizely.eventQueue[1].attributes.key === null).should.equal(true);
 
         done();
     });

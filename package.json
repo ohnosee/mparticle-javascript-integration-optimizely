@@ -1,13 +1,14 @@
 {
-  "name": "",
-  "version": "",
+  "name": "integration-optimizely",
+  "version": "1.0.0",
   "scripts": {
     "testKarma": "node test/boilerplate/test-karma.js",
-    "watch": "watchify src/mParticleJSKitBoilerplate.js -v -o build/$KIT-Kit.js --debug"
+    "watch": "watchify ./node_modules/@mparticle/web-kit-wrapper/index.js -v -o build/$KIT-Kit.js"
   },
   "devDependencies": {
-    "should": "^7.1.0",
+    "@mparticle/web-kit-wrapper": "^1.0.0-rc2",
     "mocha": "^2.3.2",
+    "should": "^7.1.0",
     "watchify": "^3.9.0"
   }
 }
