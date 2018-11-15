@@ -419,7 +419,7 @@ var UserAttributeHandler = require('../../../integration-builder/user-attribute-
             if (isInitialized) {
                 try {
                     IdentityHandler.onSetUserIdentity(forwarderSettings, id, type);
-                    return 'Successfully removed user attribute on forwarder ' + name;
+                    return 'Successfully set user Identity on forwarder ' + name;
                 } catch (e) {
                     return 'Error removing user attribute on forwarder ' + name + '; ' + e;
                 }
