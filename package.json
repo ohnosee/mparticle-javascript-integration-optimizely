@@ -1,6 +1,7 @@
 {
-  "name": "integration-optimizely",
-  "version": "1.0.0",
+  "name": "@mparticle/web-optimizely-kit",
+  "version": "2.0.0-rc1",
+  "author": "mParticle Developers <developers@mparticle.com> (https://www.mparticle.com)",
   "scripts": {
     "testKarma": "node test/boilerplate/test-karma.js",
     "watch": "watchify ./node_modules/@mparticle/web-kit-wrapper/index.js -v -o build/$KIT-Kit.js"
@@ -21,5 +22,10 @@
     "karma-mocha": "^1.3.0",
     "karma-safari-launcher": "^1.0.0",
     "shelljs": "^0.8.3"
-  }
+  },
+  "repository": "https://github.com/mparticle-integrations/mparticle-javascript-integration-optimizely",
+  "dependencies": {
+    "@mparticle/web-sdk": "^2.0.0"
+  },
+  "license": "Apache-2.0"
 }
