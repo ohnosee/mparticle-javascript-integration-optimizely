@@ -1,11 +1,15 @@
-var optimizelyEvents = require('./optimizely-defined-events');
+var optimizelyWebXEvents = require('./optimizely-x-defined-events');
+var optimizelyFullStackEvents = require('./optimizely-fs-defined-events');
+var helpers = require('./helpers');
 
 var initialization = {
     name: 'Optimizely',
     moduleId: 54,
-    initForwarder: function(settings, testMode, userAttributes, userIdentities, processEvent, eventQueue, isInitialized) {
+    initForwarder: function(settings, testMode, userAttributes, userIdentities, processEvent, eventQueue, isInitialized, common, appVersion, appName, customFlags, clientId) {
+        common.useFullStack = settings.useFullStack;
+
         if (!testMode) {
-            if (!window.optimizely) {
+            if (!window.optimizely && !settings.useFullStack) {
                 var optimizelyScript = document.createElement('script');
                 optimizelyScript.type = 'text/javascript';
                 optimizelyScript.async = true;
@@ -14,7 +18,7 @@ var initialization = {
                 optimizelyScript.onload = function() {
                     isInitialized = true;
 
-                    loadEventsAndPages();
+                    loadWebXEventsAndPages();
 
                     if (window['optimizely'] && eventQueue.length > 0) {
                         for (var i = 0; i < eventQueue.length; i++) {
@@ -25,16 +29,52 @@ var initialization = {
                 };
             } else {
                 isInitialized = true;
-                loadEventsAndPages();
+                loadWebXEventsAndPages();
             }
+
+            if (!window.optimizelyClientInstance && settings.useFullStack) {
+                common.userIdField = settings.userIdField;
+                common.userAttributes = userAttributes;
+                var errorHandler = function() {};
+
+                if (customFlags && customFlags['OptimizelyFullStack.ErrorHandler']) {
+                    errorHandler = customFlags['OptimizelyFullStack.ErrorHandler'];
+                }
+
+                var instantiateFSClient = function() {
+                    window.optimizelyClientInstance = window.optimizelySdk.createInstance({
+                        datafile: window.optimizelyDatafile,
+                        errorHandler: {handleError: errorHandler}
+                    });
+
+                    window.optimizelyClientInstance.onReady().then(function(){
+                        isInitialized = true;
+                        loadFullStackEvents();
+                    });  
+                }
+
+                helpers.loadScript('https://unpkg.com/@optimizely/optimizely-sdk/dist/optimizely.browser.umd.min.js', 
+                helpers.loadScript('https://cdn.optimizely.com/datafiles/' + settings.projectId + '.json/tag.js', instantiateFSClient));
+
+            } else {
+                isInitialized = true;
+                loadFullStackEvents();
+            }            
         } else {
             isInitialized = true;
-            loadEventsAndPages();
+            if (!settings.useFullStack) {
+                loadWebXEventsAndPages();
+            }
+            if (settings.useFullStack) {
+                common.userIdField = settings.userIdField;
+                common.userAttributes = userAttributes;
+                loadFullStackEvents();
+            }
         }
     }
 };
 
-function loadEventsAndPages() {
+function loadWebXEventsAndPages() {
     var data,
         events = {},
         pages = {};
@@ -50,8 +90,24 @@ function loadEventsAndPages() {
             pages[data.pages[page].apiName] = 1;
         }
 
-        optimizelyEvents.events = events;
-        optimizelyEvents.pages = pages;
+        optimizelyWebXEvents.events = events;
+        optimizelyWebXEvents.pages = pages;
+    }
+}
+
+function loadFullStackEvents() {
+    var fullStackData,
+    fullStackEvents = {};
+
+
+    if (window.optimizelyDatafile) {
+        fullStackData = helpers.arrayToObject(window.optimizelyDatafile.events, 'id');
+
+        for (var event in fullStackData) {
+            fullStackEvents[fullStackData[event].key] = 1;
+        }
+
+        optimizelyFullStackEvents.events = fullStackEvents;
     }
 }
 
