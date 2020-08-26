@@ -5,80 +5,215 @@ var OptimizelyKit = (function (exports) {
 
     var common = Common;
 
-    var optimizelyDefinedEvents = {
+    var optimizelyXDefinedEvents = {
         pages: {},
         events: {}
     };
+
+    var optimizelyFsDefinedEvents = {
+        events: {}
+    };
+
+    var helpers = {
+        arrayToObject: function(array, keyField) {
+            var newObj = array.reduce(function(obj, item) {
+                obj[item[keyField]] = item;
+                return obj;
+            }, {});
+        return newObj;
+        },
+        loadScript: function(src, callback) {
+            var script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.onload = callback;
+            script.src = src;
+            document.head.appendChild(script);
+        },
+        getUserId: function(userIdField) {
+            var identities = window.mParticle.Identity.getCurrentUser().getUserIdentities();
+            var userIdentities = identities['userIdentities'];
+            var userId;
+            switch(userIdField) {
+                case 'customerId':
+                    userId = userIdentities['customerId'];
+                    break;
+                case 'email':
+                    userId = userIdentities['email'];
+                    break;
+                case 'mpid':
+                    userId = userIdentities['mpid'];
+                    break;
+                case 'other':
+                    userId = userIdentities['other'];
+                    break;
+                case 'other2':
+                    userId = userIdentities['other2'];
+                    break;
+                case 'other3':
+                    userId = userIdentities['other3'];
+                    break;
+                case 'other4':
+                    userId = userIdentities['other4'];
+                    break;
+                case 'deviceApplicationStamp':
+                    userId = window.mParticle.getDeviceId();
+                    break;
+                default:
+                    // this should never hit, since a user is required to select from a userId type from the userIdField dropdown
+                    userId = null;
+            }
+
+            if (!userId) {
+                userId = window.mParticle.getDeviceId();
+            }
+            return userId;
+        },
+    };
+
+    var helpers_1 = helpers;
 
     function CommerceHandler(common) {
         this.common = common || {};
     }
 
     CommerceHandler.prototype.logCommerceEvent = function(event) {
+        var self = this;
+        
         var expandedEcommerceEvents = mParticle.eCommerce.expandCommerceEvent(
             event
         );
+
         expandedEcommerceEvents.forEach(function(expandedEvent) {
-            var optimizelyEvent = {
-                type: 'event',
-                eventName: event.EventName,
-                tags: {}
-            };
-            optimizelyEvent.tags = expandedEvent.EventAttributes || {};
-            if (
-                event.EventCategory ===
-                    mParticle.CommerceEventType.ProductPurchase ||
-                event.EventCategory === mParticle.CommerceEventType.ProductRefund
-            ) {
-                if (expandedEvent.EventName.indexOf('Total') > -1) {
+            if (!self.common.useFullStack && optimizelyXDefinedEvents.events[expandedEvent.EventName]) {
+
+                var optimizelyWebXEvent = {
+                    type: 'event',
+                    eventName: event.EventName,
+                    tags: {}
+                };
+                optimizelyWebXEvent.tags = expandedEvent.EventAttributes || {};
+                if (
+                    event.EventCategory ===
+                        mParticle.CommerceEventType.ProductPurchase ||
+                    event.EventCategory === mParticle.CommerceEventType.ProductRefund
+                ) {
+                    if (expandedEvent.EventName.indexOf('Total') > -1) {
+                        if (
+                            event.CustomFlags &&
+                            event.CustomFlags['Optimizely.EventName']
+                        ) {
+                            optimizelyWebXEvent.eventName =
+                                event.CustomFlags['Optimizely.EventName'];
+                        } else {
+                            optimizelyWebXEvent.eventName = expandedEvent.EventName;
+                        }
+                        // Overall purchase event
+                        if (
+                            expandedEvent.EventAttributes &&
+                            expandedEvent.EventAttributes['Total Amount']
+                        ) {
+                            optimizelyWebXEvent.tags.revenue =
+                                expandedEvent.EventAttributes['Total Amount'] * 100;
+                        }
+                        // other individual product events should not have revenue tags
+                        // which are added via the expandCommerceEvent method above
+                    } else {
+                        optimizelyWebXEvent.eventName = expandedEvent.EventName;
+                        if (optimizelyWebXEvent.tags.revenue) {
+                            delete optimizelyWebXEvent.tags.revenue;
+                        }
+                        if (optimizelyWebXEvent.tags.Revenue) {
+                            delete optimizelyWebXEvent.tags.Revenue;
+                        }
+                    }
+                } else {
+                    optimizelyWebXEvent.eventName = expandedEvent.EventName;
                     if (
                         event.CustomFlags &&
                         event.CustomFlags['Optimizely.EventName']
                     ) {
-                        optimizelyEvent.eventName =
+                        optimizelyWebXEvent.eventName =
                             event.CustomFlags['Optimizely.EventName'];
-                    } else {
-                        optimizelyEvent.eventName = expandedEvent.EventName;
-                    }
-                    // Overall purchase event
-                    if (
-                        expandedEvent.EventAttributes &&
-                        expandedEvent.EventAttributes['Total Amount']
-                    ) {
-                        optimizelyEvent.tags.revenue =
-                            expandedEvent.EventAttributes['Total Amount'] * 100;
-                    }
-                    // other individual product events should not have revenue tags
-                    // which are added via the expandCommerceEvent method above
-                } else {
-                    optimizelyEvent.eventName = expandedEvent.EventName;
-                    if (optimizelyEvent.tags.revenue) {
-                        delete optimizelyEvent.tags.revenue;
-                    }
-                    if (optimizelyEvent.tags.Revenue) {
-                        delete optimizelyEvent.tags.Revenue;
                     }
                 }
-            } else {
-                optimizelyEvent.eventName = expandedEvent.EventName;
-                if (
-                    event.CustomFlags &&
-                    event.CustomFlags['Optimizely.EventName']
-                ) {
-                    optimizelyEvent.eventName =
-                        event.CustomFlags['Optimizely.EventName'];
+
+                // Events that are added to the OptimizelyUI will be available on optimizelyWebXEvents.events
+                // Ignore events not included in the Optimizely UI
+                if (optimizelyXDefinedEvents.events[optimizelyWebXEvent.eventName]) {
+                    var eventCopy = {};
+                    for (var key in optimizelyWebXEvent) {
+                        eventCopy[key] = optimizelyWebXEvent[key];
+                    }
+                    window['optimizely'].push(eventCopy);
                 }
             }
 
-            // Events that are added to the OptimizelyUI will be available on optimizelyEvents.events
-            // Ignore events not included in the Optimizely UI
-            if (optimizelyDefinedEvents.events[optimizelyEvent.eventName]) {
-                var eventCopy = {};
-                for (var key in optimizelyEvent) {
-                    eventCopy[key] = optimizelyEvent[key];
+            // if optimizely full stack is being used
+            if (self.common.useFullStack && window.optimizelyClientInstance) {
+                if (optimizelyFsDefinedEvents.events[expandedEvent.EventName] || optimizelyFsDefinedEvents.events[event.CustomFlags['OptimizelyFullStack.EventName']]) {
+                    var eventKey = expandedEvent.EventName,
+                        userId,
+                        userAttributes = self.common.userAttributes,
+                        eventTags = {};
+
+                    eventTags = expandedEvent.EventAttributes || {};
+
+                    if (window.mParticle && window.mParticle.Identity) {
+                        userId = helpers_1.getUserId(self.common.userIdField);
+                    }
+
+                    if (
+                        event.EventCategory ===
+                            mParticle.CommerceEventType.ProductPurchase ||
+                        event.EventCategory === mParticle.CommerceEventType.ProductRefund
+                    ) {
+                        if (expandedEvent.EventName.indexOf('Total') > -1) {
+                            if (
+                                event.CustomFlags &&
+                                event.CustomFlags['OptimizelyFullStack.EventName']
+                            ) {
+                                eventKey =
+                                    event.CustomFlags['OptimizelyFullStack.EventName'];
+                            } else {
+                                eventKey = expandedEvent.EventName;
+                            }
+
+                            // Overall purchase event
+                            if (
+                                expandedEvent.EventAttributes &&
+                                expandedEvent.EventAttributes['Total Amount']
+                            ) {
+                                eventTags.revenue =
+                                    expandedEvent.EventAttributes['Total Amount'] * 100;
+                            }
+                            // other individual product events should not have revenue tags
+                            // which are added via the expandCommerceEvent method above
+                        } else {
+                            if (
+                                event.CustomFlags &&
+                                event.CustomFlags['OptimizelyFullStack.EventName']
+                            ) {
+                                eventKey =
+                                    event.CustomFlags['OptimizelyFullStack.EventName'];
+                            }
+                            if (eventTags.revenue) {
+                                delete eventTags.revenue;
+                            }
+                        }
+                    } else {
+                        eventKey = expandedEvent.EventName;
+                        if (
+                            event.CustomFlags &&
+                            event.CustomFlags['OptimizelyFullStack.EventName']
+                        ) {
+                            eventKey =
+                                event.CustomFlags['OptimizelyFullStack.EventName'];
+                        }
+                    }
+                    window['optimizelyClientInstance'].track(eventKey, userId, userAttributes, eventTags);                
                 }
-                window['optimizely'].push(eventCopy);
             }
+
         });
     };
 
@@ -89,33 +224,58 @@ var OptimizelyKit = (function (exports) {
     }
 
     EventHandler.prototype.logEvent = function(event) {
-        if (optimizelyDefinedEvents.events[event.EventName]) {
-            var optimizelyEvent = {
+        if (!this.common.useFullStack && optimizelyXDefinedEvents.events[event.EventName]) {
+            var optimizelyWebXEvent = {
                 type: 'event',
                 eventName: event.EventName
             };
 
             if (event.EventAttributes) {
-                optimizelyEvent.tags = event.EventAttributes;
+                optimizelyWebXEvent.tags = event.EventAttributes;
             }
 
             if (event.CustomFlags && event.CustomFlags['Optimizely.Value']) {
-                optimizelyEvent.tags.value = event.CustomFlags['Optimizely.Value'];
+                optimizelyWebXEvent.tags.value = event.CustomFlags['Optimizely.Value'];
             }
-            window['optimizely'].push(optimizelyEvent);
+            window['optimizely'].push(optimizelyWebXEvent);
+        }
+
+        // if optimizely full stack is being used
+        if (this.common.useFullStack && window.optimizelyClientInstance && optimizelyFsDefinedEvents.events[event.EventName]) {
+            var eventKey = event.EventName,
+                userId,
+                userAttributes = this.common.userAttributes,
+                eventTags = {};
+
+            if (window.mParticle && window.mParticle.Identity) {
+                userId = helpers_1.getUserId(this.common.userIdField);
+            }
+
+            if (event.EventAttributes) {
+                eventTags = event.EventAttributes;
+            }
+
+            if (event.CustomFlags && event.CustomFlags['OptimizelyFullStack.Value']) {
+                eventTags.value = event.CustomFlags['OptimizelyFullStack.Value'];
+            }
+
+            window['optimizelyClientInstance'].track(eventKey, userId, userAttributes, eventTags);
         }
     };
+
     EventHandler.prototype.logPageView = function(event) {
-        if (optimizelyDefinedEvents.pages[event.EventName]) {
-            var optimizelyEvent = {
+        var self = this;
+
+        if (!self.common.useFullStack && optimizelyXDefinedEvents.pages[event.EventName]) {
+            var optimizelyWebXEvent = {
                 type: 'page',
                 pageName: event.EventName
             };
 
             if (event.EventAttributes) {
-                optimizelyEvent.tags = event.EventAttributes;
+                optimizelyWebXEvent.tags = event.EventAttributes;
             }
-            window['optimizely'].push(optimizelyEvent);
+            window['optimizely'].push(optimizelyWebXEvent);
         }
     };
 
@@ -180,9 +340,11 @@ var OptimizelyKit = (function (exports) {
     var initialization = {
         name: 'Optimizely',
         moduleId: 54,
-        initForwarder: function(settings, testMode, userAttributes, userIdentities, processEvent, eventQueue, isInitialized) {
+        initForwarder: function(settings, testMode, userAttributes, userIdentities, processEvent, eventQueue, isInitialized, common, appVersion, appName, customFlags, clientId) {
+            common.useFullStack = settings.useFullStack;
+
             if (!testMode) {
-                if (!window.optimizely) {
+                if (!window.optimizely && !settings.useFullStack) {
                     var optimizelyScript = document.createElement('script');
                     optimizelyScript.type = 'text/javascript';
                     optimizelyScript.async = true;
@@ -190,7 +352,7 @@ var OptimizelyKit = (function (exports) {
                     (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(optimizelyScript);
                     optimizelyScript.onload = function() {
 
-                        loadEventsAndPages();
+                        loadWebXEventsAndPages();
 
                         if (window['optimizely'] && eventQueue.length > 0) {
                             for (var i = 0; i < eventQueue.length; i++) {
@@ -200,15 +362,49 @@ var OptimizelyKit = (function (exports) {
                         }
                     };
                 } else {
-                    loadEventsAndPages();
+                    loadWebXEventsAndPages();
                 }
+
+                if (!window.optimizelyClientInstance && settings.useFullStack) {
+                    common.userIdField = settings.userIdField;
+                    common.userAttributes = userAttributes;
+                    var errorHandler = function() {};
+
+                    if (customFlags && customFlags['OptimizelyFullStack.ErrorHandler']) {
+                        errorHandler = customFlags['OptimizelyFullStack.ErrorHandler'];
+                    }
+
+                    var instantiateFSClient = function() {
+                        window.optimizelyClientInstance = window.optimizelySdk.createInstance({
+                            datafile: window.optimizelyDatafile,
+                            errorHandler: {handleError: errorHandler}
+                        });
+
+                        window.optimizelyClientInstance.onReady().then(function(){
+                            loadFullStackEvents();
+                        });  
+                    };
+
+                    helpers_1.loadScript('https://unpkg.com/@optimizely/optimizely-sdk/dist/optimizely.browser.umd.min.js', 
+                    helpers_1.loadScript('https://cdn.optimizely.com/datafiles/' + settings.projectId + '.json/tag.js', instantiateFSClient));
+
+                } else {
+                    loadFullStackEvents();
+                }            
             } else {
-                loadEventsAndPages();
+                if (!settings.useFullStack) {
+                    loadWebXEventsAndPages();
+                }
+                if (settings.useFullStack) {
+                    common.userIdField = settings.userIdField;
+                    common.userAttributes = userAttributes;
+                    loadFullStackEvents();
+                }
             }
         }
     };
 
-    function loadEventsAndPages() {
+    function loadWebXEventsAndPages() {
         var data,
             events = {},
             pages = {};
@@ -224,8 +420,24 @@ var OptimizelyKit = (function (exports) {
                 pages[data.pages[page].apiName] = 1;
             }
 
-            optimizelyDefinedEvents.events = events;
-            optimizelyDefinedEvents.pages = pages;
+            optimizelyXDefinedEvents.events = events;
+            optimizelyXDefinedEvents.pages = pages;
+        }
+    }
+
+    function loadFullStackEvents() {
+        var fullStackData,
+        fullStackEvents = {};
+
+
+        if (window.optimizelyDatafile) {
+            fullStackData = helpers_1.arrayToObject(window.optimizelyDatafile.events, 'id');
+
+            for (var event in fullStackData) {
+                fullStackEvents[fullStackData[event].key] = 1;
+            }
+
+            optimizelyFsDefinedEvents.events = fullStackEvents;
         }
     }
 
@@ -243,24 +455,37 @@ var OptimizelyKit = (function (exports) {
     var sessionHandler_1 = sessionHandler;
 
     function UserAttributeHandler(common) {
-        this.common = common = {};
+        this.common = common || {};
     }
 
     UserAttributeHandler.prototype.onRemoveUserAttribute = function(key) {
-        var attribute = {};
-        attribute[key] = null;
-        window['optimizely'].push({
-            type: 'user',
-            attributes: attribute
-        });
+        if (!this.common.useFullStack && window.optimizely) {
+            var attribute = {};
+            attribute[key] = null;
+            window['optimizely'].push({
+                type: 'user',
+                attributes: attribute
+            });
+        }
+        if (this.common.useFullStack && window.optimizelyClientInstance) {
+            if (this.common.userAttributes[key]) {
+                delete this.common.userAttributes[key];
+            }
+        }
     };
     UserAttributeHandler.prototype.onSetUserAttribute = function(key, value) {
-        var attribute = {};
-        attribute[key] = value;
-        window['optimizely'].push({
-            type: 'user',
-            attributes: attribute
-        });
+        if (!this.common.useFullStack && window.optimizely) {
+            var attribute = {};
+            attribute[key] = value;
+            window['optimizely'].push({
+                type: 'user',
+                attributes: attribute
+            });
+        }
+        if (this.common.useFullStack && window.optimizelyClientInstance) {
+            var self = this;
+            self.common.userAttributes[key] = value;
+        }    
     };
 
     var userAttributeHandler = UserAttributeHandler;
