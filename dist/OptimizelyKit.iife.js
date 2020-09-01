@@ -341,7 +341,7 @@ var OptimizelyKit = (function (exports) {
         name: 'Optimizely',
         moduleId: 54,
         initForwarder: function(settings, testMode, userAttributes, userIdentities, processEvent, eventQueue, isInitialized, common, appVersion, appName, customFlags, clientId) {
-            common.useFullStack = settings.useFullStack;
+            common.useFullStack = settings.useFullStack === 'True';
 
             if (!testMode) {
                 if (!window.optimizely && !settings.useFullStack) {
