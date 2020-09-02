@@ -344,7 +344,7 @@ var OptimizelyKit = (function (exports) {
             common.useFullStack = settings.useFullStack === 'True';
 
             if (!testMode) {
-                if (!window.optimizely && !settings.useFullStack) {
+                if (!window.optimizely && !common.useFullStack) {
                     var optimizelyScript = document.createElement('script');
                     optimizelyScript.type = 'text/javascript';
                     optimizelyScript.async = true;
@@ -365,7 +365,7 @@ var OptimizelyKit = (function (exports) {
                     loadWebXEventsAndPages();
                 }
 
-                if (!window.optimizelyClientInstance && settings.useFullStack) {
+                if (!window.optimizelyClientInstance && common.useFullStack) {
                     common.userIdField = settings.userIdField;
                     common.userAttributes = userAttributes;
                     var errorHandler = function() {};
@@ -392,10 +392,10 @@ var OptimizelyKit = (function (exports) {
                     loadFullStackEvents();
                 }            
             } else {
-                if (!settings.useFullStack) {
+                if (!common.useFullStack) {
                     loadWebXEventsAndPages();
                 }
-                if (settings.useFullStack) {
+                if (common.useFullStack) {
                     common.userIdField = settings.userIdField;
                     common.userAttributes = userAttributes;
                     loadFullStackEvents();
