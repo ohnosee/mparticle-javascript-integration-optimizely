@@ -16,7 +16,7 @@
         "watch": "ENVIRONMENT=production rollup --config rollup.config.js -w"
     },
     "devDependencies": {
-        "@mparticle/web-kit-wrapper": "^1.0.4",
+        "@mparticle/web-kit-wrapper": "^1.0.5",
         "chai": "^4.2.0",
         "karma": "^3.1.1",
         "karma-chai": "^0.1.0",
