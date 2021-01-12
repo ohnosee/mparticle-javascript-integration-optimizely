@@ -19,17 +19,6 @@ const productionBuilds = {
         },
         plugins: [...production.plugins],
     },
-    // Remove rootIife in a future build once the database is updated to use dist/ iife instead
-    rootIife: {
-        input: production.input,
-        output: {
-            ...production.output,
-            format: 'iife',
-            file: 'Optimizely.js',
-            name: 'mpOptimizelyKit',
-        },
-        plugins: [...production.plugins],
-    },
     cjs: {
         input: production.input,
         output: {
@@ -55,11 +44,7 @@ const testEndToEndBuild = {
 
 let selectedBuilds = [];
 if (ENVIRONMENT === 'production') {
-    selectedBuilds.push(
-        productionBuilds.iife,
-        productionBuilds.rootIife,
-        productionBuilds.cjs
-    );
+    selectedBuilds.push(productionBuilds.iife, productionBuilds.cjs);
 } else if (ENVIRONMENT === 'testEndToEnd') {
     selectedBuilds.push(testEndToEndBuild);
 }
