@@ -36,7 +36,7 @@ var helpers = {
         var userId;
         switch(userIdField) {
             case 'customerId':
-                userId = userIdentities['customerId'];
+                userId = userIdentities['customerid'];
                 break;
             case 'email':
                 userId = userIdentities['email'];
